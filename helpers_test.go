@@ -21,7 +21,7 @@ func Test_encodeDecodeMsg(t *testing.T) {
 func Test_shareToStrStrToShare(t *testing.T) {
 	// generate 10 random big.Int and convert them to string
 	for i := 0; i < 10; i++ {
-		share := new(big.Int).Mul(defaultPrime, big.NewInt(rand.Int63()))
+		share := new(big.Int).Mul(DefaultPrime, big.NewInt(rand.Int63()))
 		shareStr := shareToStr(share)
 		shareBack := strToShare(shareStr)
 		if share.Cmp(shareBack) != 0 {

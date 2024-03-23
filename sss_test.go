@@ -8,9 +8,9 @@ import (
 const examplePrivateMessage = "56b919ced4ba8ee15e4f73c76120064629f056407d42c58a07106dd8f5096cd0"
 
 func TestHideRecoverMessage(t *testing.T) {
-	config := Config{
-		Shares: 36,
-		Min:    30,
+	config := &Config{
+		Shares: 8,
+		Min:    7,
 	}
 	totalShares, err := HideMessage(examplePrivateMessage, config)
 	if err != nil {
@@ -22,7 +22,7 @@ func TestHideRecoverMessage(t *testing.T) {
 		return
 	}
 	for _, share := range totalShares {
-		t.Log(share)
+		t.Log(share, len(share))
 	}
 	// get 30 shares randomly of 36 and recover the message
 	shares := []string{}
