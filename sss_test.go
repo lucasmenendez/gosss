@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const examplePrivateMessage = "56b919ced4ba8ee15e4f73c76120064629f056407d42c58a07106dd8f5096cd0"
+const examplePrivateMessage = "aaa"
 
 func TestHideRecoverMessage(t *testing.T) {
 	config := &Config{
@@ -21,10 +21,7 @@ func TestHideRecoverMessage(t *testing.T) {
 		t.Errorf("unexpected number of shares: %d", len(totalShares))
 		return
 	}
-	for _, share := range totalShares {
-		t.Log(share, len(share))
-	}
-	// get 30 shares randomly of 36 and recover the message
+	// get some shares randomly of the total and recover the message
 	shares := []string{}
 	choosen := map[string]int{}
 	for len(choosen) < config.Min {

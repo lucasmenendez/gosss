@@ -2,7 +2,6 @@ package gosss
 
 import (
 	"math/big"
-	"math/rand"
 	"testing"
 )
 
@@ -21,10 +20,25 @@ func Test_encodeDecodeMsg(t *testing.T) {
 func Test_shareToStrStrToShare(t *testing.T) {
 	// generate 10 random big.Int and convert them to string
 	for i := 0; i < 10; i++ {
-		share := new(big.Int).Mul(DefaultPrime, big.NewInt(rand.Int63()))
-		shareStr := shareToStr(share)
-		shareBack := strToShare(shareStr)
-		if share.Cmp(shareBack) != 0 {
+		idx := big.NewInt(int64(i))
+		rand, err := randBigInt()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		shareStr, err := shareToStr(idx, rand)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return
+		}
+		index, shareBack, err := strToShare(shareStr)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return
+		}
+		if index.Cmp(idx) != 0 {
+			t.Errorf("unexpected index: %d", index)
+		}
+		if rand.Cmp(shareBack) != 0 {
 			t.Errorf("unexpected share: %s", shareStr)
 		}
 	}
