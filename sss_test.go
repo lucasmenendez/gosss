@@ -23,16 +23,16 @@ func TestHideRecoverMessage(t *testing.T) {
 	}
 	// get some shares randomly of the total and recover the message
 	shares := []string{}
-	choosen := map[string]int{}
-	for len(choosen) < config.Min {
+	chosen := map[string]int{}
+	for len(chosen) < config.Min {
 		// random number between 0 and 35
 		idx := rand.Intn(config.Shares)
-		_, ok := choosen[totalShares[idx]]
+		_, ok := chosen[totalShares[idx]]
 		for ok {
 			idx = rand.Intn(config.Shares)
-			_, ok = choosen[totalShares[idx]]
+			_, ok = chosen[totalShares[idx]]
 		}
-		choosen[totalShares[idx]] = idx
+		chosen[totalShares[idx]] = idx
 		shares = append(shares, totalShares[idx])
 	}
 	message, err := RecoverMessage(shares, config)
