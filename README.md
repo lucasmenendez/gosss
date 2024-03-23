@@ -1,11 +1,12 @@
 # gosss - Go Shamir's Secret Sharing
 
-`gosss` is a Go library implementing the Shamir's Secret Sharing algorithm, a cryptographic method for splitting a secret into multiple parts. This implementation allows for secure sharing and reconstruction of secrets in a distributed system.
-
-## Badges
-
 [![GoDoc](https://godoc.org/github.com/lucasmenendez/gosss?status.svg)](https://godoc.org/github.com/lucasmenendez/gosss)
 [![Build Status](https://github.com/lucasmenendez/gosss/actions/workflows/main.yml/badge.svg)](https://github.com/lucasmenendez/gosss/actions)
+
+`gosss` is a Go library implementing the Shamir's Secret Sharing algorithm, a cryptographic method for splitting a secret into multiple parts. This implementation allows for secure sharing and reconstruction of secrets in a distributed system.
+
+⚠️ This is a *for fun* implementation, it is not ready for use in a production system. ⚠️
+
 
 ## Getting Started
 
