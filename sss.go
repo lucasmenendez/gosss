@@ -13,6 +13,12 @@ import (
 // defined it uses the 12th Mersenne Prime (2^127 - 1) as default. It returns
 // an error if the message cannot be encoded.
 func HideMessage(message string, conf *Config) ([]string, error) {
+	// the hide operation needs the minimum number of shares and the total
+	// number of shares, so if the configuration is not provided, return an
+	// error
+	if conf == nil {
+		return nil, fmt.Errorf("configuration is required")
+	}
 	// prepare the configuration to hide the message
 	if err := conf.prepare(hideOp); err != nil {
 		return nil, err
@@ -57,6 +63,12 @@ func HideMessage(message string, conf *Config) ([]string, error) {
 // provided shares does not matter. It decodes the points of the polynomial from
 // the shares and calculates the Lagrange interpolation to recover the secret.
 func RecoverMessage(shares []string, conf *Config) (string, error) {
+	// the recover operation does not need the minimum number of shares or the
+	// total number of shares, so if the configuration is not provided, create a
+	// empty configuration before prepare the it.
+	if conf == nil {
+		conf = &Config{}
+	}
 	// prepare the configuration to recover the message
 	if err := conf.prepare(recoverOp); err != nil {
 		return "", err
