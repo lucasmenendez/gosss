@@ -1,9 +1,6 @@
 package gosss
 
-import (
-	"fmt"
-	"math/big"
-)
+import "math/big"
 
 // 12th Mersenne Prime (2^127 - 1)
 var DefaultPrime *big.Int = new(big.Int).Sub(new(big.Int).Exp(big.NewInt(2), big.NewInt(127), nil), big.NewInt(1))
@@ -40,10 +37,10 @@ func (c *Config) prepare(op operation) error {
 		// and the minimum number of shares is greater than 1 and lower than
 		// the number of shares
 		if c.Shares <= 0 || c.Shares > maxShares {
-			return fmt.Errorf("number of shares must be between 1 and %d", maxShares)
+			return ErrConfigShares
 		}
 		if c.Min <= 1 || c.Min >= c.Shares {
-			return fmt.Errorf("minimum number of shares must be between 2 and %d", c.Shares-1)
+			return ErrConfigMin
 		}
 	case recoverOp:
 		// for recover a message no checks are needed unless the prime number is
@@ -51,11 +48,18 @@ func (c *Config) prepare(op operation) error {
 		// it is needed
 		break
 	default:
-		return fmt.Errorf("unknown operation")
+		return ErrConfigOp
 	}
 	// if the prime number is not defined it will use the default prime number
 	if c.Prime == nil {
 		c.Prime = DefaultPrime
 	}
 	return nil
+}
+
+// maxSecretPartSize returns the maximum size of the secret part that can be
+// hidden in a share, it is the size of the prime number in bytes minus 1, to
+// ensure the secret part is smaller than the prime number.
+func (c *Config) maxSecretPartSize() int {
+	return len(c.Prime.Bytes()) - 1
 }

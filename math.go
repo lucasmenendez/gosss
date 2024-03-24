@@ -3,11 +3,44 @@ package gosss
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
 )
+
+// randBigInt generates a random big.Int number. It uses the crypto/rand package
+// to generate the random number. It returns an error if the random number
+// cannot be generated.
+func randBigInt() (*big.Int, error) {
+	var b [8]byte
+	_, err := rand.Read(b[:])
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrReadingRandom, err)
+	}
+	// convert the bytes to an int64 and ensure it is non-negative
+	randomInt := int64(binary.BigEndian.Uint64(b[:])) & (1<<63 - 1)
+	// scale down the random int to the range [0, max)
+	return big.NewInt(randomInt % math.MaxInt64), nil
+}
+
+// calcCoeffs function generates the coefficients for the polynomial. It takes
+// the secret and the number of coefficients to generate. It returns the
+// coefficients as a list of big.Int. It returns an error if the coefficients
+// cannot be generated. The secret is the first coefficient of the polynomial,
+// the rest of the coefficients are random numbers.
+func calcCoeffs(secret *big.Int, k int) ([]*big.Int, error) {
+	// calculate k-1 random coefficients
+	randCoeffs := make([]*big.Int, k-1)
+	for i := 0; i < len(randCoeffs); i++ {
+		randCoeff, err := randBigInt()
+		if err != nil {
+			return nil, err
+		}
+		randCoeffs[i] = randCoeff
+	}
+	// include secret as the first coefficient and return the coefficients
+	return append([]*big.Int{secret}, randCoeffs...), nil
+}
 
 // solvePolynomial solves a polynomial with coefficients coeffs for x
 // and returns the result. It follows the formula:
@@ -23,6 +56,26 @@ func solvePolynomial(coeffs []*big.Int, x, prime *big.Int) *big.Int {
 		accum.Mod(accum, prime)
 	}
 	return accum
+}
+
+// calcShares function calculates the shares of the polynomial for the given
+// coefficients and the number of shares to generate. It returns the x and y
+// coordinates of the shares. The x coordinates are the index of the share and
+// the y coordinates are the share itself. It uses the prime number to perform
+// the modular operation in the finite field. It returns an error if the shares
+// cannot be calculated. It skips the x = 0 coordinate because it is the secret
+// itself.
+func calcShares(coeffs []*big.Int, shares int, prime *big.Int) ([]*big.Int, []*big.Int) {
+	// calculate shares solving the polynomial for x = {1, shares}, x = 0 is the
+	// secret
+	var xs, yx []*big.Int
+	for i := 0; i < shares; i++ {
+		x := big.NewInt(int64(i + 1))
+		y := solvePolynomial(coeffs, x, prime)
+		xs = append(xs, x)
+		yx = append(yx, y)
+	}
+	return xs, yx
 }
 
 // lagrangeInterpolation calculates the Lagrange interpolation for the given
@@ -79,57 +132,4 @@ func lagrangeInterpolation(xCoords, yCoords []*big.Int, prime, _x *big.Int) *big
 		result.Mod(result, prime)
 	}
 	return result
-}
-
-// msgToBigInt converts a string to a big.Int. It uses the bytes of the string
-// to create the big.Int.
-func msgToBigInt(s string) *big.Int {
-	return new(big.Int).SetBytes([]byte(s))
-}
-
-// bigIntToMsg converts a big.Int to a string. It uses the bytes of the big.Int
-// to create the string.
-func bigIntToMsg(i *big.Int) string {
-	return string(i.Bytes())
-}
-
-// shareToStr converts a big.Int to a string. It uses the bytes of the big.Int
-func shareToStr(index, share *big.Int) (string, error) {
-	if index.Cmp(big.NewInt(255)) > 0 || index.Cmp(big.NewInt(0)) < 0 {
-		return "", fmt.Errorf("the index must fit in a byte (0-255)")
-	}
-	bShare := share.Bytes()
-	// encode the index in a byte and append it at the end of the share
-	bIndex := index.Bytes()
-	if len(bIndex) == 0 {
-		bIndex = []byte{0}
-	}
-	fullShare := append(bShare, bIndex[0])
-	return hex.EncodeToString(fullShare), nil
-}
-
-// strToShare converts a string to a big.Int. It uses the bytes of the string
-func strToShare(s string) (*big.Int, *big.Int, error) {
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error decoding share: %v", err)
-	}
-	bIndex := b[len(b)-1]
-	bShare := b[:len(b)-1]
-	return new(big.Int).SetBytes([]byte{bIndex}), new(big.Int).SetBytes(bShare), nil
-}
-
-// randBigInt generates a random big.Int number. It uses the crypto/rand package
-// to generate the random number. It returns an error if the random number
-// cannot be generated.
-func randBigInt() (*big.Int, error) {
-	var b [8]byte
-	_, err := rand.Read(b[:])
-	if err != nil {
-		return nil, err
-	}
-	// convert the bytes to an int64 and ensure it is non-negative
-	randomInt := int64(binary.BigEndian.Uint64(b[:])) & (1<<63 - 1)
-	// scale down the random int to the range [0, max)
-	return big.NewInt(randomInt % math.MaxInt64), nil
 }

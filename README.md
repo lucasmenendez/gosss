@@ -29,6 +29,7 @@ package main
 
 import (
 	"log"
+	"math/rand"
 
 	"github.com/lucasmenendez/gosss"
 )
@@ -37,29 +38,36 @@ func main() {
 	// create a configuration with 8 shares and 7 minimum shares to recover the
 	// message
 	config := &gosss.Config{
-		Shares: 8,
-		Min:    7,
+		Shares: 4,
+		Min:    3,
 	}
 	// hide a message with the defined configuration
-	shares, err := gosss.HideMessage("secret", config)
+	msg := "688641b753f1c97526d6a767058a80fd6c6519f5bdb0a08098986b0478c8502b"
+	log.Printf("message to hide: %s", msg)
+	totalShares, err := gosss.HideMessage([]byte(msg), config)
 	if err != nil {
 		log.Fatalf("error hiding message: %v", err)
 	}
 	// print every share and exclude one share to test the recovery
-	excluded := 3
-	requiredShares := []string{}
-	for i, s := range shares {
-		log.Printf("share: %s", s)
-		if i != excluded {
-			requiredShares = append(requiredShares, s)
+	requiredShares := [][]string{}
+	for _, secretShares := range totalShares {
+		log.Printf("shares: %v", secretShares)
+		// choose a random share to exclude
+		index := rand.Intn(len(secretShares))
+		shares := []string{}
+		for i, share := range secretShares {
+			if i == index {
+				continue
+			}
+			shares = append(shares, share)
 		}
+		requiredShares = append(requiredShares, shares)
 	}
 	// recover the message with the required shares
 	message, err := gosss.RecoverMessage(requiredShares, nil)
 	if err != nil {
 		log.Fatalf("error recovering message: %v", err)
 	}
-	log.Printf("recovered message: %s", message)
+	log.Printf("recovered message: %s", string(message))
 }
-
 ```
