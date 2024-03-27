@@ -6,85 +6,95 @@ import (
 )
 
 func Test_prepare(t *testing.T) {
-	noMin := &Config{
-		Shares: 8,
-		Min:    0,
+	c := Config{}
+	c.prepare()
+	if c.Prime.Cmp(DefaultPrime) != 0 {
+		t.Errorf("expected %v, got %v", DefaultPrime, c.Prime)
 	}
-	if err := noMin.prepare(hideOp); err == nil {
-		t.Errorf("expected error")
+	newPrime := big.NewInt(103)
+	c.Prime = new(big.Int).Set(newPrime)
+	c.prepare()
+	if c.Prime.Cmp(newPrime) != 0 {
+		t.Errorf("expected %v, got %v", newPrime, c.Prime)
+	}
+}
+
+func Test_checkParts(t *testing.T) {
+	// valid configuration
+	validConfig := Config{Shares: 12, Min: 8, Prime: big.NewInt(13)}
+	if err := validConfig.checkParts(4); err != nil {
+		t.Errorf("Valid Configuration: Expected no error, got %v", err)
 		return
 	}
-	if err := noMin.prepare(recoverOp); err != nil {
-		t.Errorf("unexpected error: %v", err)
+	// shares less than minimum
+	lessThanMinSharesConfig := Config{Shares: 2, Min: 1, Prime: big.NewInt(13)}
+	if err := lessThanMinSharesConfig.checkParts(1); err == nil {
+		t.Errorf("shares less than minimum: Expected error, got none")
 		return
 	}
-	oneMin := &Config{
-		Shares: 8,
-		Min:    1,
-	}
-	if err := oneMin.prepare(hideOp); err == nil {
-		t.Errorf("expected error")
+	// shares greater than maximum
+	greaterThanMaxSharesConfig := Config{Shares: maxShares + 1, Min: 20000, Prime: big.NewInt(13)}
+	if err := greaterThanMaxSharesConfig.checkParts(10000); err == nil {
+		t.Errorf("shares Greater than maximum: Expected error, got none")
 		return
 	}
-	if err := oneMin.prepare(recoverOp); err != nil {
-		t.Errorf("unexpected error: %v", err)
+	// hares Not Divisible by parts
+	sharesNotDivisibleConfig := Config{Shares: 10, Min: 5, Prime: big.NewInt(13)}
+	if err := sharesNotDivisibleConfig.checkParts(3); err == nil {
+		t.Errorf("shares Not Divisible by parts: Expected error, got none")
 		return
 	}
-	wrongMin := &Config{
-		Shares: 8,
-		Min:    9,
-	}
-	if err := wrongMin.prepare(hideOp); err == nil {
-		t.Errorf("expected error")
+	// inimum shares less than allowed
+	minSharesLessThanAllowedConfig := Config{Shares: 12, Min: 3, Prime: big.NewInt(13)}
+	if err := minSharesLessThanAllowedConfig.checkParts(4); err == nil {
+		t.Errorf("Minimum shares less than allowed: Expected error, got none")
 		return
 	}
-	if err := wrongMin.prepare(recoverOp); err != nil {
-		t.Errorf("unexpected error: %v", err)
+	// inimum shares Greater than allowed
+	minSharesGreaterThanAllowedConfig := Config{Shares: 12, Min: 10, Prime: big.NewInt(13)}
+	if err := minSharesGreaterThanAllowedConfig.checkParts(4); err == nil {
+		t.Errorf("Minimum shares Greater than allowed: Expected error, got none")
 		return
 	}
-	noShares := &Config{
-		Shares: 0,
-		Min:    7,
+}
+
+func Test_maxSecretPartSize(t *testing.T) {
+	c := Config{Prime: big.NewInt(13)}
+	if c.maxSecretPartSize() != 0 {
+		t.Errorf("expected 0, got %d", c.maxSecretPartSize())
 	}
-	if err := noShares.prepare(hideOp); err == nil {
-		t.Errorf("expected error")
-		return
+	c.Prime = big.NewInt(1000000000000000000)
+	if c.maxSecretPartSize() != 7 {
+		t.Errorf("expected 7, got %d", c.maxSecretPartSize())
 	}
-	if err := noShares.prepare(recoverOp); err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
+}
+
+func Test_minByPart(t *testing.T) {
+	c := Config{Min: 8}
+	if c.minByPart() != 0 {
+		t.Errorf("expected 0, got %d", c.minByPart())
 	}
-	maxShares := &Config{
-		Shares: 257,
-		Min:    7,
+	c.nParts = 4
+	if c.minByPart() != 2 {
+		t.Errorf("expected 2, got %d", c.minByPart())
 	}
-	if err := maxShares.prepare(hideOp); err == nil {
-		t.Errorf("expected error")
-		return
+	c.nParts = 0
+	if c.minByPart() != 0 {
+		t.Errorf("expected 0, got %d", c.minByPart())
 	}
-	if err := maxShares.prepare(recoverOp); err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
+}
+
+func Test_sharesByPart(t *testing.T) {
+	c := Config{Shares: 12}
+	if c.sharesByPart() != 0 {
+		t.Errorf("expected 0, got %d", c.sharesByPart())
 	}
-	basicConf := &Config{
-		Shares: 8,
-		Min:    7,
+	c.nParts = 4
+	if c.sharesByPart() != 3 {
+		t.Errorf("expected 3, got %d", c.sharesByPart())
 	}
-	if err := basicConf.prepare(hideOp); err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
-	if basicConf.Prime.Cmp(DefaultPrime) != 0 {
-		t.Errorf("unexpected prime number: %v", basicConf.Prime)
-		return
-	}
-	basicConf.Prime = big.NewInt(1003)
-	if err := basicConf.prepare(recoverOp); err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
-	if basicConf.Prime.Cmp(big.NewInt(1003)) != 0 {
-		t.Errorf("unexpected prime number: %v", basicConf.Prime)
-		return
+	c.nParts = 0
+	if c.sharesByPart() != 0 {
+		t.Errorf("expected 0, got %d", c.sharesByPart())
 	}
 }

@@ -10,11 +10,9 @@ func Test_encodeDecodeMessage(t *testing.T) {
 	var maxPartSize = len(DefaultPrime.Bytes()) - 1
 	var inputMessage = []byte("688641b753f1c97526d6a767058a80fd6c6519f5bdb0a08098986b0478c8502b")
 	var expectedParts = []*big.Int{
-		new(big.Int).SetBytes([]byte("688641b753f1c97")),
-		new(big.Int).SetBytes([]byte("526d6a767058a80")),
-		new(big.Int).SetBytes([]byte("fd6c6519f5bdb0a")),
-		new(big.Int).SetBytes([]byte("08098986b0478c8")),
-		new(big.Int).SetBytes([]byte("502b")),
+		new(big.Int).SetBytes([]byte("688641b753f1c97526d6a767058a80f")),
+		new(big.Int).SetBytes([]byte("d6c6519f5bdb0a08098986b0478c850")),
+		new(big.Int).SetBytes([]byte("2b")),
 	}
 	parts := encodeMessage(inputMessage, maxPartSize)
 	if len(parts) != len(expectedParts) {

@@ -2,7 +2,6 @@ package gosss
 
 import (
 	"bytes"
-	"math/rand"
 	"testing"
 )
 
@@ -10,8 +9,8 @@ var examplePrivateMessage = []byte("Lorem ipsum dolor sit amet, consectetur adip
 
 func TestHideRecoverMessage(t *testing.T) {
 	config := &Config{
-		Shares: 4,
-		Min:    3,
+		Shares: 33,
+		Min:    22,
 	}
 	totalShares, err := HideMessage(examplePrivateMessage, config)
 	if err != nil {
@@ -19,18 +18,20 @@ func TestHideRecoverMessage(t *testing.T) {
 		return
 	}
 
-	candidateShares := [][]string{}
-	for _, secretShares := range totalShares {
-		// choose a random index to remove a share
-		shares := []string{}
-		index := rand.Intn(len(secretShares))
-		for i, share := range secretShares {
-			if i == index {
-				continue
-			}
-			shares = append(shares, share)
+	completedSecrets := map[int][]string{}
+	candidateShares := []string{}
+	for _, share := range totalShares {
+		secret, _, _, err := strToShare(share)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return
 		}
-		candidateShares = append(candidateShares, shares)
+		iSecret := int(secret.Int64())
+		curret, ok := completedSecrets[iSecret]
+		if !ok || len(curret) < config.minByPart() {
+			completedSecrets[iSecret] = append(completedSecrets[iSecret], share)
+			candidateShares = append(candidateShares, share)
+		}
 	}
 	message, err := RecoverMessage(candidateShares, config)
 	if err != nil {

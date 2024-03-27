@@ -29,7 +29,6 @@ package main
 
 import (
 	"log"
-	"math/rand"
 
 	"github.com/lucasmenendez/gosss"
 )
@@ -38,8 +37,8 @@ func main() {
 	// create a configuration with 8 shares and 7 minimum shares to recover the
 	// message
 	config := &gosss.Config{
-		Shares: 4,
-		Min:    3,
+		Shares: 9,
+		Min:    6,
 	}
 	// hide a message with the defined configuration
 	msg := "688641b753f1c97526d6a767058a80fd6c6519f5bdb0a08098986b0478c8502b"
@@ -49,25 +48,31 @@ func main() {
 		log.Fatalf("error hiding message: %v", err)
 	}
 	// print every share and exclude one share to test the recovery
-	requiredShares := [][]string{}
-	for _, secretShares := range totalShares {
-		log.Printf("shares: %v", secretShares)
-		// choose a random share to exclude
-		index := rand.Intn(len(secretShares))
-		shares := []string{}
-		for i, share := range secretShares {
-			if i == index {
-				continue
-			}
-			shares = append(shares, share)
+	requiredShares := []string{}
+	completedSecrets := map[int][]string{}
+	for _, share := range totalShares {
+		// choose some shares for each secret until reach the minimum
+		secret, err := gosss.ShareSecret(share)
+		if err != nil {
+			log.Fatalf("error sharing secret: %v", err)
 		}
-		requiredShares = append(requiredShares, shares)
+		current, ok := completedSecrets[secret]
+		if !ok || len(current) < 2 {
+			completedSecrets[secret] = append(completedSecrets[secret], share)
+			requiredShares = append(requiredShares, share)
+			log.Printf("selected share: %s", share)
+			continue
+		}
+		log.Printf("discared share: %s", share)
 	}
-	// recover the message with the required shares
+	// recover the message with the required shares, the configuration is not
+	// needed because the shares have the information to recover the message and
+	// default prime number is used during the hiding process
 	message, err := gosss.RecoverMessage(requiredShares, nil)
 	if err != nil {
 		log.Fatalf("error recovering message: %v", err)
 	}
 	log.Printf("recovered message: %s", string(message))
 }
+
 ```
