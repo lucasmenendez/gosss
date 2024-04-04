@@ -1,0 +1,30 @@
+<html>
+    <head>
+        <title>Go Shamir Secret Sharing demo</title>
+    </head>
+    <body>
+        <script src="wasm_exec.js"></script>
+        <script>
+            function throwError(e) {
+                console.error(e);
+            }
+        
+            function hide(message, sharesCount, threshold) {
+                let rawshares = GoSSS.hide(message, sharesCount, threshold);
+                return JSON.parse(rawshares);
+            }
+        
+            function recover(shares) {
+                let message = GoSSS.recover(JSON.stringify(shares));
+                return message;
+            }
+        
+            (async function() {
+                const go = new Go();
+                const result = await WebAssembly.instantiateStreaming(fetch("gosss.wasm"), go.importObject);
+                go.run(result.instance);
+            })()
+        </script>
+    </body>
+</html>
+
