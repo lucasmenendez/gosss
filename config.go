@@ -13,6 +13,23 @@ var DefaultPrime, _ = new(big.Int).SetString("2188824287183927522224640574525727
 // using 2 bytes (255^2)
 const maxShares = 65536
 
+// ConfigLimits returns the limits for the number of shares and minimum shares
+// to recover the original message based on the message size. It returns the
+// minimum number of shares, the maximum number of shares, the minimum number
+// of shares to recover the secret, and the maximum number of shares to recover
+// the secret. The message is divided into parts based on the size of the prime
+// number used as finite field, the number of parts is used to calculate the
+// limits.
+func ConfigLimits(message []byte) (int, int, int, int) {
+	c := &Config{Prime: DefaultPrime}
+	secrets := encodeMessage(message, c.maxSecretPartSize())
+	nSecrets := len(secrets)
+	minShares := nSecrets * 3
+	minMin := nSecrets * 2
+	maxMin := maxShares - nSecrets
+	return minShares, maxShares, minMin, maxMin
+}
+
 // Config struct defines the configuration for the Shamir Secret Sharing
 // algorithm. It includes the number of shares to generate, the minimum number
 // of shares to recover the secret, and the prime number to use as finite field.
