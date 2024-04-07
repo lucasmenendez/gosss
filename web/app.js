@@ -77,10 +77,10 @@ const app = createApp({
             const result = JSON.parse(rawResult);
             if (!result.error) {
                 this.config = {
-                    minShares: result.data[0],
-                    maxShares: result.data[1],
-                    minMin: result.data[2],
-                    maxMin: result.data[3],
+                    minShares: result.data.minShares,
+                    maxShares: result.data.maxShares,
+                    minMin: result.data.minMin,
+                    maxMin: result.data.maxMin,
                 }
                 if (this.sharesCount < this.config.minShares) this.sharesCount = this.config.minShares;
                 if (this.sharesCount > this.config.maxShares) this.sharesCount = this.config.maxShares;

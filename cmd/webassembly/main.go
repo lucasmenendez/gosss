@@ -81,7 +81,12 @@ func main() {
 		}
 		// recover the message
 		minShares, maxShares, minMin, maxMin := gosss.ConfigLimits([]byte(p[0].String()))
-		return wasmResult([]int{minShares, maxShares, minMin, maxMin}, nil)
+		return wasmResult(map[string]int{
+			"minShares": minShares,
+			"maxShares": maxShares,
+			"minMin":    minMin,
+			"maxMin":    maxMin,
+		}, nil)
 	}))
 
 	js.Global().Set(jsClassName, gosssClass)
