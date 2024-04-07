@@ -9,7 +9,7 @@ on:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -36,15 +36,14 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Build wasm
         run: |
-          go build -o ${{ steps.pages.outputs.base_path }}/gosss.wasm ./cmd/webassembly/main.go
+          go build -o ./web/gosss.wasm ./cmd/webassembly/main.go
       - name: Copy go wasm js engine
         run: |
-          cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" ${{ steps.pages.outputs.base_path }}
-          cp -r ./web ${{ steps.pages.outputs.base_path }}
+          cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" ./web/
       - name: Upload to Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ steps.pages.outputs.base_path }}
+          path: ./web
       - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4
