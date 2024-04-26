@@ -2,25 +2,31 @@ package gosss
 
 import (
 	"crypto/rand"
-	"encoding/binary"
-	"fmt"
+	"errors"
 	"math"
 	"math/big"
 )
 
-// randBigInt generates a random big.Int number. It uses the crypto/rand package
+// randBigInt generates a random big.Int. It uses the crypto/rand package
 // to generate the random number. It returns an error if the random number
 // cannot be generated.
-func randBigInt() (*big.Int, error) {
-	var b [8]byte
+func randBigInt(n int, base *big.Int) (*big.Int, error) {
+	// generate a random int64 number with the crypto/rand package and the
+	// number of bytes defined in the parameter
+	b := make([]byte, n)
 	_, err := rand.Read(b[:])
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrReadingRandom, err)
+		return nil, errors.Join(ErrReadingRandom, err)
 	}
-	// convert the bytes to an int64 and ensure it is non-negative
-	randomInt := int64(binary.BigEndian.Uint64(b[:])) & (1<<63 - 1)
-	// scale down the random int to the range [0, max)
-	return big.NewInt(randomInt % math.MaxInt64), nil
+	// convert the random bytes to a big.Int
+	randomBigInt := new(big.Int).SetBytes(b)
+	// scale down the random int to the range [0, base)
+	if base == nil {
+		// if base is not defined, return the random number with the maximum
+		// int64 value
+		return new(big.Int).Mod(randomBigInt, big.NewInt(math.MaxInt64)), nil
+	}
+	return new(big.Int).Mod(randomBigInt, base), nil
 }
 
 // calcCoeffs function generates the coefficients for the polynomial. It takes
@@ -28,11 +34,11 @@ func randBigInt() (*big.Int, error) {
 // coefficients as a list of big.Int. It returns an error if the coefficients
 // cannot be generated. The secret is the first coefficient of the polynomial,
 // the rest of the coefficients are random numbers.
-func calcCoeffs(secret *big.Int, k int) ([]*big.Int, error) {
+func calcCoeffs(secret, prime *big.Int, k int) ([]*big.Int, error) {
 	// calculate k-1 random coefficients
 	randCoeffs := make([]*big.Int, k-1)
 	for i := 0; i < len(randCoeffs); i++ {
-		randCoeff, err := randBigInt()
+		randCoeff, err := randBigInt(8, prime)
 		if err != nil {
 			return nil, err
 		}
@@ -65,11 +71,11 @@ func solvePolynomial(coeffs []*big.Int, x, prime *big.Int) *big.Int {
 // the modular operation in the finite field. It returns an error if the shares
 // cannot be calculated. It skips the x = 0 coordinate because it is the secret
 // itself.
-func calcShares(coeffs []*big.Int, shares int, prime *big.Int) ([]*big.Int, []*big.Int) {
+func calcShares(coeffs []*big.Int, nshares int, prime *big.Int) ([]*big.Int, []*big.Int) {
 	// calculate shares solving the polynomial for x = {1, shares}, x = 0 is the
 	// secret
 	var xs, yx []*big.Int
-	for i := 0; i < shares; i++ {
+	for i := 0; i < nshares; i++ {
 		x := big.NewInt(int64(i + 1))
 		y := solvePolynomial(coeffs, x, prime)
 		xs = append(xs, x)

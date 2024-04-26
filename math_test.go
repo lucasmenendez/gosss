@@ -8,7 +8,7 @@ import (
 func Test_randBigInt(t *testing.T) {
 	generatedRands := make(map[int64]bool)
 	for i := 0; i < 100000; i++ {
-		rand, err := randBigInt()
+		rand, err := randBigInt(8, nil)
 		if err != nil {
 			t.Fatalf("error generating random number: %v", err)
 			return
@@ -23,7 +23,7 @@ func Test_randBigInt(t *testing.T) {
 
 func Test_calcCoeffs(t *testing.T) {
 	secret := big.NewInt(123456789)
-	coeffs, err := calcCoeffs(secret, 5)
+	coeffs, err := calcCoeffs(secret, DefaultPrime, 5)
 	if err != nil {
 		t.Fatalf("error calculating coefficients: %v", err)
 		return
@@ -121,13 +121,22 @@ func Test_solvePolynomial(t *testing.T) {
 
 func Test_calcShares(t *testing.T) {
 	prime := big.NewInt(5)
-	// f(x) = 5 + x + 2x^2 + 3x^3
+	// f(x) = a + bx + cx^2 + dx^3 = 5 + x + 2x^2 + 3x^3
 	coeffs := []*big.Int{
 		big.NewInt(5),
 		big.NewInt(1),
 		big.NewInt(2),
 		big.NewInt(3),
 	}
+	var solve = func(x, prime *big.Int) *big.Int {
+		a := new(big.Int).Set(coeffs[0])
+		b := new(big.Int).Mul(coeffs[1], x)
+		c := new(big.Int).Mul(coeffs[2], new(big.Int).Mul(x, x))
+		d := new(big.Int).Mul(coeffs[3], new(big.Int).Mul(x, new(big.Int).Mul(x, x)))
+		res := new(big.Int).Add(a, new(big.Int).Add(b, new(big.Int).Add(c, d)))
+		return new(big.Int).Mod(res, prime)
+	}
+
 	k := len(coeffs)
 	xs, ys := calcShares(coeffs, k, prime)
 	if len(xs) != k {
@@ -138,27 +147,17 @@ func Test_calcShares(t *testing.T) {
 		t.Fatalf("invalid number of y coordinates")
 		return
 	}
-	expectedYs := []*big.Int{
-		big.NewInt(1), // x = 1; f(1) = 5 + 1 + 2 + 3 = 11 % 5 = 1
-		big.NewInt(4), // x = 2; f(2) = 5 + 2 + 8 + 24 = 39 % 5 = 4
-		big.NewInt(2), // x = 3; f(3) = 5 + 3 + 18 + 81 = 107 % 5 = 2
-		big.NewInt(3), // x = 4; f(4) = 5 + 4 + 32 + 192 = 233 % 5 = 3
-	}
-	for i := 0; i < k; i++ {
-		if xs[i].Cmp(big.NewInt(int64(i+1))) != 0 {
-			t.Fatalf("invalid x coordinate, expected %v, got %v", i+1, xs[i])
-			return
-		}
-		if ys[i].Cmp(expectedYs[i]) != 0 {
-			t.Fatalf("invalid y coordinate (%d), expected %v, got %v", i, expectedYs[i], ys[i])
-			return
+	for i, x := range xs {
+		y := solve(x, prime)
+		if y.Cmp(ys[i]) != 0 {
+			t.Errorf("invalid y coordinate, expected %v, got %v", y, ys[i])
 		}
 	}
 }
 
 func Test_lagrangeInterpolation(t *testing.T) {
-	prime := big.NewInt(5)
-	// f(x) = (6 + x + 2x^2 + 3x^3) % 5
+	prime := big.NewInt(17)
+	// f(x) = (6 + x + 2x^2 + 3x^3) % 17
 	coeffs := []*big.Int{
 		big.NewInt(6),
 		big.NewInt(1),
@@ -166,26 +165,26 @@ func Test_lagrangeInterpolation(t *testing.T) {
 		big.NewInt(3),
 	}
 	xs, ys := calcShares(coeffs, len(coeffs), prime)
-	// x = 0; f(0) = 6 % 5 = 1
+	// x = 0; f(0) = 6 % 17 = 6
 	x0 := big.NewInt(0)
-	y0 := big.NewInt(1)
+	y0 := big.NewInt(6)
 	result0 := lagrangeInterpolation(xs, ys, prime, x0)
 	if result0.Cmp(y0) != 0 {
 		t.Errorf("x = 0 failed, expected %v, got %v", y0, result0)
 		return
 	}
 
-	// x = 3; f(3) = 6 + 3 + 18 + 81 = 108 % 5 = 3
+	// x = 3; f(3) = 6 + 3 + 18 + 81 = 108 % 17 = 6
 	x3 := big.NewInt(3)
-	y3 := big.NewInt(3)
+	y3 := big.NewInt(6)
 	result3 := lagrangeInterpolation(xs, ys, prime, x3)
 	if result3.Cmp(y3) != 0 {
 		t.Errorf("x = 3 failed, expected %v, got %v", y3, result3)
 		return
 	}
-	// x = 4; f(4) = 6 + 4 + 32 + 192 = 234 % 5 = 4
+	// x = 4; f(4) = 6 + 4 + 32 + 192 = 234 % 17 = 13
 	x4 := big.NewInt(4)
-	y4 := big.NewInt(4)
+	y4 := big.NewInt(13)
 	result4 := lagrangeInterpolation(xs, ys, prime, x4)
 	if result4.Cmp(y4) != 0 {
 		t.Errorf("x = 4 failed, expected %v, got %v", y4, result4)

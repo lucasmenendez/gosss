@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"syscall/js"
 
 	"github.com/lucasmenendez/gosss"
@@ -16,11 +17,10 @@ const (
 	jsClassName     = "GoSSS"
 	jsHideMethod    = "hide"
 	jsRecoverMethod = "recover"
-	jsLimitsMethod  = "limits"
+	jsMaxLenMethod  = "maxLength"
 	// required number of arguments for each method
-	hidedNArgs    = 3 // msg, nshares, minshares
-	recoverdNArgs = 1 // shares
-	limitsNArgs   = 1 // msg
+	hidedNArgs    = 3 // msg, nshares, minshares, prime(*)
+	recoverdNArgs = 1 // shares, prime(*)
 )
 
 func wasmResult(data interface{}, err error) js.Value {
@@ -39,19 +39,29 @@ func wasmResult(data interface{}, err error) js.Value {
 }
 
 func main() {
-	gosssClass := js.ValueOf(map[string]interface{}{})
+	gosssClass := js.ValueOf(map[string]interface{}{
+		"defaultPrime": gosss.DefaultPrime.String(),
+		"minShares":    gosss.MinShares,
+		"minMinShares": gosss.MinMinShares,
+	})
 	gosssClass.Set(jsHideMethod, js.FuncOf(func(this js.Value, p []js.Value) interface{} {
-		if len(p) != hidedNArgs {
+		if len(p) < hidedNArgs {
 			return wasmResult(nil, fmt.Errorf("invalid number of arguments"))
 		}
 		msg := p[0].String()
-		nshares := p[1].Int()
-		minshares := p[2].Int()
+		conf := &gosss.Config{
+			Shares: p[1].Int(),
+			Min:    p[2].Int(),
+		}
+		if len(p) > hidedNArgs {
+			strPrime := p[3].String()
+			var ok bool
+			if conf.Prime, ok = new(big.Int).SetString(strPrime, 10); !ok {
+				return wasmResult(nil, fmt.Errorf("invalid prime number"))
+			}
+		}
 		// hide the message
-		shares, err := gosss.HideMessage([]byte(msg), &gosss.Config{
-			Shares: nshares,
-			Min:    minshares,
-		})
+		shares, err := gosss.HideMessage([]byte(msg), conf)
 		if err != nil {
 			return wasmResult(nil, err)
 		}
@@ -59,7 +69,7 @@ func main() {
 	}))
 
 	gosssClass.Set(jsRecoverMethod, js.FuncOf(func(this js.Value, p []js.Value) interface{} {
-		if len(p) != recoverdNArgs {
+		if len(p) < recoverdNArgs {
 			return wasmResult(nil, fmt.Errorf("invalid number of arguments"))
 		}
 		// recover the shares from the json string
@@ -67,26 +77,35 @@ func main() {
 		if err := json.Unmarshal([]byte(p[0].String()), &shares); err != nil {
 			return wasmResult(nil, err)
 		}
+		conf := &gosss.Config{}
+		if len(p) > recoverdNArgs {
+			strPrime := p[1].String()
+			var ok bool
+			if conf.Prime, ok = new(big.Int).SetString(strPrime, 10); !ok {
+				return wasmResult(nil, fmt.Errorf("invalid prime number"))
+			}
+		}
 		// recover the message
-		msg, err := gosss.RecoverMessage(shares, nil)
+		msg, err := gosss.RecoverMessage(shares, conf)
 		if err != nil {
 			return wasmResult(nil, err)
 		}
 		return wasmResult(msg, nil)
 	}))
 
-	gosssClass.Set(jsLimitsMethod, js.FuncOf(func(this js.Value, p []js.Value) interface{} {
-		if len(p) != limitsNArgs {
-			return wasmResult(nil, fmt.Errorf("invalid number of arguments"))
+	gosssClass.Set(jsMaxLenMethod, js.FuncOf(func(this js.Value, p []js.Value) interface{} {
+		conf := &gosss.Config{}
+		if len(p) > 0 {
+			strPrime := p[0].String()
+			var ok bool
+			if conf.Prime, ok = new(big.Int).SetString(strPrime, 10); !ok {
+				return wasmResult(nil, fmt.Errorf("invalid prime number"))
+			}
 		}
-		// recover the message
-		minShares, maxShares, minMin, maxMin := gosss.ConfigLimits([]byte(p[0].String()))
-		return wasmResult(map[string]int{
-			"minShares": minShares,
-			"maxShares": maxShares,
-			"minMin":    minMin,
-			"maxMin":    maxMin,
-		}, nil)
+		if err := conf.ValidPrime(); err != nil {
+			return wasmResult(nil, err)
+		}
+		return wasmResult(conf.MaxMessageLen(), nil)
 	}))
 
 	js.Global().Set(jsClassName, gosssClass)

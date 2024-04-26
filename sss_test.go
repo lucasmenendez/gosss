@@ -2,10 +2,11 @@ package gosss
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
 )
 
-var examplePrivateMessage = []byte("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque nisl turpis, molestie sit amet ullamcorper sit amet, cursus in diam. Aenean urna nunc, hendrerit sed ipsum suscipit, lacinia feugiat metus. Phasellus pulvinar, tellus sit amet euismod vulputate, justo nisi finibus tellus, a ultrices odio mi vitae nibh. Duis accumsan nunc.")
+var examplePrivateMessage = []byte("Lorem ipsum.")
 
 func TestHideRecoverMessage(t *testing.T) {
 	config := &Config{
@@ -17,23 +18,21 @@ func TestHideRecoverMessage(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 		return
 	}
-
-	completedSecrets := map[int][]string{}
-	candidateShares := []string{}
-	for _, share := range totalShares {
-		secret, _, _, err := strToShare(share)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return
+	// get some shares randomly of the total and recover the message
+	shares := []string{}
+	chosen := map[string]int{}
+	for len(chosen) < config.Min {
+		// random number between 0 and 35
+		idx := rand.Intn(config.Shares)
+		_, ok := chosen[totalShares[idx]]
+		for ok {
+			idx = rand.Intn(config.Shares)
+			_, ok = chosen[totalShares[idx]]
 		}
-		iSecret := int(secret.Int64())
-		curret, ok := completedSecrets[iSecret]
-		if !ok || len(curret) < config.minByPart() {
-			completedSecrets[iSecret] = append(completedSecrets[iSecret], share)
-			candidateShares = append(candidateShares, share)
-		}
+		chosen[totalShares[idx]] = idx
+		shares = append(shares, totalShares[idx])
 	}
-	message, err := RecoverMessage(candidateShares, config)
+	message, err := RecoverMessage(shares, config)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return

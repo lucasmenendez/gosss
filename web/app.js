@@ -3,15 +3,11 @@ import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js'
 const app = createApp({
     data() {
         return {
-            config: {
-                minShares: 0,
-                maxShares: 0,
-                minMin: 0,
-                maxMin: 0,
-            },
             message: "",
-            sharesCount: 0,
-            threshold: 0,
+            maxLength: 0,
+            prime: 0n,
+            sharesCount: 3,
+            threshold: 2,
             shares: "",
             currentTab: "hide",
             hide_result: "",
@@ -20,6 +16,14 @@ const app = createApp({
     },
     async created() {
         await this.setupWebAssembly();
+        this.prime = GoSSS.defaultPrime;
+        this.maxLength = this.getMaxLength();
+    },
+    computed: {
+        messageLength() {
+            const encoder = new TextEncoder();
+            return encoder.encode(this.message).length;
+        },
     },
     template: `
         <div style="width: 90%; max-width: 800px; margin: 50px auto;" class="is-shadowed is-rounded has-p-12">
@@ -34,19 +38,29 @@ const app = createApp({
                 <button class="button has-m-2 has-w-full" :class="{'is-normal': currentTab != 'hide'}" @click="currentTab = 'hide'">Hide</button>
                 <button class="button has-m-2 has-w-full" :class="{'is-normal': currentTab != 'recover'}" @click="currentTab = 'recover'">Recover</button>
             </div>
+            <div class="has-mt-6 has-mb-6">
+                <label class="label has-mb-2">Enter a large prime number</label>
+                <input type="number" class="input" v-model="prime" placeholder="Enter a prime number">
+                <small>Large prime numbers will be able to hide more information.</small>
+            </div>
             <div v-show="currentTab === 'hide'">
                 <h3 class="has-mt-6 has-mb-8">Hide a message</h3>
-                <textarea class="textarea has-mb-4" v-model="message" placeholder="Enter your message" rows="6"></textarea>
+                <div class="has-mb-4">
+                    <label class="label has-mb-2">Enter the message to hide</label>
+                    <textarea class="textarea" v-model="message" @input="validMessage" placeholder="Enter your message" rows="6"></textarea>
+                    <small>Bytes length: {{ messageLength }}/{{ maxLength }}</small>
+                </div>
                 <div class="is-flex has-direction-row has-justify-center has-mb-4">
-                    <div class="has-w-full has-m-2" v-show="message">
+                    <div class="has-w-full" v-show="message">
                         <label class="label">Shares </label>
-                        <input v-model="sharesCount" type="number" class="input" :min="config.minShares" :max="config.maxShares" :step="config.minShares">
-                        <small>(min {{ config.minShares }}, max {{ config.maxShares }})</small>
+                        <input v-model="sharesCount" type="number" class="input" min="3" step="1">
+                        <small>(min 3)</small>
                     </div>
-                    <div class="has-w-full has-m-2" v-show="message">
+                    <div class="has-m-2" v-show="message"></div>
+                    <div class="has-w-full" v-show="message">
                         <label class="label">Threshold</label>
-                        <input v-model="threshold" type="number" class="input" :min="config.minMin" :max="config.maxMin">
-                        <small>(min {{ config.minMin }}, max {{ config.maxMin }})</small>
+                        <input v-model="threshold" type="number" class="input" min="2" :max="sharesCount - 1">
+                        <small>(min 2, max {{ sharesCount - 1 }})</small>
                     </div>
                 </div>
                 <button class="button is-secondary has-w-full has-mt-4 has-mb-4" :class="{'is-disabled': !message}" @click="hideMessage">Hide</button>
@@ -72,27 +86,8 @@ const app = createApp({
             const result = await WebAssembly.instantiateStreaming(fetch("gosss.wasm"), go.importObject);
             go.run(result.instance);
         },
-        getConfig() {
-            const rawResult = GoSSS.limits(this.message);
-            const result = JSON.parse(rawResult);
-            if (!result.error) {
-                this.config = {
-                    minShares: result.data.minShares,
-                    maxShares: result.data.maxShares,
-                    minMin: result.data.minMin,
-                    maxMin: result.data.maxMin,
-                }
-                if (this.sharesCount < this.config.minShares) this.sharesCount = this.config.minShares;
-                if (this.sharesCount > this.config.maxShares) this.sharesCount = this.config.maxShares;
-                this.config.maxMin = this.sharesCount - (this.config.minShares / 3);
-                if (this.threshold < this.config.minMin) this.threshold = this.config.minMin;
-                if (this.threshold > this.config.maxMin) this.threshold = this.config.maxMin;
-            } else {
-                alert(`Error getting configuration: ${result.error}`);
-            }
-        },
         hideMessage() {
-            const rawResult = GoSSS.hide(this.message, this.sharesCount, this.threshold);
+            const rawResult = GoSSS.hide(this.message, this.sharesCount, this.threshold, BigInt(this.prime).toString());
             const result = JSON.parse(rawResult);
             if (!result.error) {
                 this.hide_result = result.data.join("\n");
@@ -102,22 +97,28 @@ const app = createApp({
         },
         recoverMessage() {
             const shares = JSON.stringify(this.shares.split("\n"));
-            const rawResult = GoSSS.recover(shares);
+            const rawResult = GoSSS.recover(shares, BigInt(this.prime).toString());
             const result = JSON.parse(rawResult);
             if (!result.error) {
                 this.recovered_message = window.atob(result.data);
             } else {
                 alert(`Error recovering message: ${result.error}`);
             }
+        },
+        getMaxLength() {
+            const rawResult = GoSSS.maxLength(this.prime);
+            const result = JSON.parse(rawResult);
+            if (!result.error) {
+                return parseInt(result.data);
+            } else {
+                alert(`Error hiding message: ${result.error}`);
+            }
+        },
+        validMessage() {
+            if (this.messageLength > this.maxLength) {
+                this.message = this.message.slice(0, this.maxLength);
+            }
         }
-    },
-    watch: {
-        message() {
-            this.getConfig();
-        },
-        sharesCount() {
-            this.getConfig();
-        },
     },
 });
 

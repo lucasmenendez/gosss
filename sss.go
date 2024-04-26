@@ -1,8 +1,8 @@
 package gosss
 
 import (
+	"fmt"
 	"math/big"
-	"slices"
 )
 
 // HideMessage generates the shares of the message using the Shamir Secret
@@ -20,40 +20,28 @@ func HideMessage(message []byte, conf *Config) ([]string, error) {
 		return nil, ErrRequiredConfig
 	}
 	conf.prepare()
-	// split the message to a list of big.Int to be used as shamir secrets
-	secrets := encodeMessage(message, conf.maxSecretPartSize())
-	if len(secrets) == 0 {
-		return nil, ErrEncodeMessage
-	}
-	// check if the configuration is valid for the number of secrets
-	if err := conf.checkParts(len(secrets)); err != nil {
+	// validate the configuration for the message provided
+	if err := conf.ValidConfig(message); err != nil {
 		return nil, err
 	}
-	// generate the shares for each secret and return them encoded as strings
-	hSecrets := []int{}
-	hXs := []*big.Int{}
-	hYs := []*big.Int{}
-	for i, secret := range secrets {
-		// calculate random coefficients for the polynomial
-		coeffs, err := calcCoeffs(secret, conf.minByPart())
-		if err != nil {
-			return nil, err
-		}
-		// calculate the shares with the polynomial and the prime number
-		xs, yx := calcShares(coeffs, conf.sharesByPart(), conf.Prime)
-		// append the shares to the result
-		for range xs {
-			hSecrets = append(hSecrets, i+1)
-		}
-		hXs = append(hXs, xs...)
-		hYs = append(hYs, yx...)
-	}
-	// convert the shares to strings and append them to the result
-	hShares, err := encodeShares(hSecrets, hXs, hYs)
+	// calculate k random coefficients for the polynomial, where k is the
+	// minimum number of shares less one (the secret is the first coefficient)
+	coeffs, err := calcCoeffs(new(big.Int).SetBytes(message), conf.Prime, conf.Min)
 	if err != nil {
 		return nil, err
 	}
-	return hShares, nil
+	// calculate the shares with the polynomial and the prime number
+	xs, ys := calcShares(coeffs, conf.Shares, conf.Prime)
+	// encode the shares
+	shares := []string{}
+	for i := 0; i < len(xs); i++ {
+		share, err := shareToStr(xs[i], ys[i])
+		if err != nil {
+			return nil, fmt.Errorf("error encoding shares: %w", err)
+		}
+		shares = append(shares, share)
+	}
+	return shares, nil
 }
 
 // RecoverMessage recovers the message from the shares using the Shamir Secret
@@ -73,52 +61,22 @@ func RecoverMessage(inputs []string, conf *Config) ([]byte, error) {
 	}
 	// prepare the configuration to recover the message
 	conf.prepare()
+	if err := conf.ValidPrime(); err != nil {
+		return nil, err
+	}
 	// convert shares to big.Ints points coordinates
-	secrets, xs, xy, err := decodeShares(inputs)
-	if err != nil {
-		return nil, err
-	}
-	// recover the secret parts from the shares
-	parts, err := recoverParts(secrets, xs, xy, conf)
-	if err != nil {
-		return nil, err
-	}
-	// decode the message from the parts and return it
-	return decodeMessage(parts), nil
-}
-
-func recoverParts(secrets []int, xs, ys []*big.Int, conf *Config) ([]*big.Int, error) {
-	// check if all slices provided have the same length and non zero length
-	if len(xs) != len(ys) || len(secrets) != len(xs) || len(secrets) == 0 {
-		return nil, ErrInvalidShares
-	}
-	// recover the secret parts from the shares, group the shares by secret
-	// and store the unique secrets to avoid duplicate calculations
-	uniqueSecrets := []int{}
-	xsBySecret := map[int][]*big.Int{}
-	ysBySecret := map[int][]*big.Int{}
-	for i, s := range secrets {
-		_, exists := xsBySecret[s]
-		if !exists {
-			uniqueSecrets = append(uniqueSecrets, s)
+	xs, ys := []*big.Int{}, []*big.Int{}
+	for _, input := range inputs {
+		x, y, err := strToShare(input)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding shares: %w", err)
 		}
-		xsBySecret[s] = append(xsBySecret[s], xs[i])
-		ysBySecret[s] = append(ysBySecret[s], ys[i])
+		xs = append(xs, x)
+		ys = append(ys, y)
 	}
-	// sort the secrets to preserve the order of the message parts
-	slices.Sort(uniqueSecrets)
-	parts := []*big.Int{}
-	for _, s := range uniqueSecrets {
-		xs := xsBySecret[s]
-		ys := ysBySecret[s]
-		// check if the secret has the same number of coordinates
-		if len(xs) != len(ys) || len(xs) == 0 {
-			return nil, ErrInvalidShares
-		}
-		// calculate the secret part using the Lagrange interpolation, the
-		// secret is the first coefficient of the polynomial (x = 0)
-		part := lagrangeInterpolation(xs, ys, conf.Prime, big.NewInt(0))
-		parts = append(parts, part)
-	}
-	return parts, nil
+	// calculate the secret using the Lagrange interpolation, the secret is the
+	// first coefficient of the polynomial (x = 0)
+	secret := lagrangeInterpolation(xs, ys, conf.Prime, big.NewInt(0))
+	// decode the message from the secret y coord
+	return secret.Bytes(), nil
 }
