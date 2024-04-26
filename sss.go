@@ -1,9 +1,6 @@
 package gosss
 
-import (
-	"fmt"
-	"math/big"
-)
+import "math/big"
 
 // HideMessage generates the shares of the message using the Shamir Secret
 // Sharing algorithm. It returns the shares as strings. The message is encoded
@@ -37,7 +34,7 @@ func HideMessage(message []byte, conf *Config) ([]string, error) {
 	for i := 0; i < len(xs); i++ {
 		share, err := shareToStr(xs[i], ys[i])
 		if err != nil {
-			return nil, fmt.Errorf("error encoding shares: %w", err)
+			return nil, err
 		}
 		shares = append(shares, share)
 	}
@@ -69,7 +66,7 @@ func RecoverMessage(inputs []string, conf *Config) ([]byte, error) {
 	for _, input := range inputs {
 		x, y, err := strToShare(input)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding shares: %w", err)
+			return nil, err
 		}
 		xs = append(xs, x)
 		ys = append(ys, y)

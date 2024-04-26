@@ -52,6 +52,9 @@ func (c *Config) ValidPrime() error {
 	if !c.Prime.ProbablyPrime(0) {
 		return ErrConfigInvalidPrime
 	}
+	if len(c.Prime.Bytes()) < 2 {
+		return ErrConfigInvalidPrime
+	}
 	return nil
 }
 
