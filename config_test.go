@@ -11,7 +11,7 @@ func Test_prepare(t *testing.T) {
 	if c.Prime.Cmp(DefaultPrime) != 0 {
 		t.Errorf("expected %v, got %v", DefaultPrime, c.Prime)
 	}
-	newPrime := big.NewInt(103)
+	newPrime := big.NewInt(1003)
 	c.Prime = new(big.Int).Set(newPrime)
 	c.prepare()
 	if c.Prime.Cmp(newPrime) != 0 {
